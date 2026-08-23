@@ -1,0 +1,16 @@
+-- virtual env setup
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+
+
+-- streamlit dummy files for testing
+mkdir -p .streamlit
+touch .streamlit/secrets.toml
+
+
+-- test command to create local tunnel
+streamlit run app.py
+
+

@@ -152,25 +152,27 @@ def process_submission(parent_email, student_name_for_lookup, student_name_displ
     gc = get_gspread_client()
     sheet = gc.open(GHSEET_NAME).worksheet("Submissions")
 
-    # Remove existing bids for this student
+    # Remove existing bids for this student matching student_name and student_grade
     all_rows = sheet.get_all_records()
     filtered_rows = [
         r
         for r in all_rows
         if not (
-            str(r["parent_email"]).lower() == parent_email.lower()
-            and str(r["student_name"]).lower()
-            == student_name_for_lookup
+            str(r["student_name"]).strip().lower() == student_name_for_lookup
+            and str(r["student_grade"]).strip() == str(student_grade_input).strip()
         )
     ]
 
     # Append new bids by checking session state for all eligible classes
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # Iterate over ALL eligible classes to get their bids from session state
-    for _, c_row in eligible_classes.iterrows(): # Use eligible_classes for initialization
+
+    bids_key = f"bids_{student_name_for_lookup}_{student_grade_input}"
+    bids_dict = st.session_state.get(bids_key, {})
+
+    # Iterate over ALL eligible classes to get their bids from persistent state
+    for _, c_row in eligible_classes.iterrows():
         cid = str(c_row["class_id"])
-        key = f"bid_{parent_email}_{student_name_for_lookup}_{cid}"
-        bid_val = st.session_state.get(key, 0) # Get bid value from session state
+        bid_val = bids_dict.get(cid, 0)
 
         if bid_val > 0:
             filtered_rows.append(
@@ -193,6 +195,7 @@ def process_submission(parent_email, student_name_for_lookup, student_name_displ
             [df_new.columns.values.tolist()]
             + df_new.values.tolist()
         )
+    st.cache_data.clear()
     st.success(f"✅ Bids successfully recorded for {student_name_display}!")
     st.balloons()
 
@@ -212,14 +215,35 @@ with tab_parent:
 
     parent_name = col1.text_input("Parent Full Name").strip()
 
-    # Updated student grade options
+    # Updated student grade options with an empty default placeholder
+    grade_options = ["Select Grade...", 'K', 1, 2, 3, 4, 5, 6, 7, 8]
     student_grade_input = col2.selectbox(
-        "Child's Grade", options=['K', 1, 2, 3, 4, 5, 6, 7, 8], index=0
+        "Child's Grade", options=grade_options, index=0
     )
-    # Map 'K' to 0 for internal logic
-    student_grade_int = grade_to_int(student_grade_input)
 
-    if parent_email and student_name_for_lookup:
+    # Validation check for all 4 Step 1 fields
+    all_fields_populated = bool(
+        parent_email
+        and student_name_display
+        and parent_name
+        and student_grade_input in ['K', 1, 2, 3, 4, 5, 6, 7, 8]
+    )
+
+    identity_signature = f"{parent_email}|{student_name_for_lookup}|{parent_name}|{student_grade_input}"
+    if st.session_state.get("last_confirmed_identity") != identity_signature:
+        st.session_state["step1_proceeded"] = False
+
+    if not st.session_state.get("step1_proceeded", False):
+        if st.button("Proceed to Step 2", type="primary", key="btn_proceed_step2"):
+            if not all_fields_populated:
+                st.error("⚠️ Please fill out all 4 fields (Parent Email, Child's Full Name, Parent Full Name, and Child's Grade) to proceed.")
+            else:
+                st.session_state["step1_proceeded"] = True
+                st.session_state["last_confirmed_identity"] = identity_signature
+                st.rerun()
+
+    if st.session_state.get("step1_proceeded", False) and all_fields_populated:
+        student_grade_int = grade_to_int(student_grade_input)
         df_classes_raw = load_sheet_data("Classes")
         df_classes = generate_class_ids(df_classes_raw) # Generate class_id here
         df_submissions = load_sheet_data("Submissions")
@@ -243,7 +267,10 @@ with tab_parent:
               " entries below will overwrite previous bids."
           )
           saved_bids = dict(
-              zip(existing_lookup["class_id"], existing_lookup["bid_amount"])
+              zip(
+                  existing_lookup["class_id"].astype(str),
+                  existing_lookup["bid_amount"].astype(int),
+              )
           )
         else:
           saved_bids = {}
@@ -263,17 +290,23 @@ with tab_parent:
         if eligible_classes.empty:
             st.warning("No eligible classes available for this grade level.")
         else:
-            # Point tracking via Streamlit session state
-            # Initialize session state for eligible classes if not already present
-            for _, c_row in eligible_classes.iterrows(): # Use eligible_classes for initialization
-                cid = str(c_row["class_id"])
-                key = f"bid_{parent_email}_{student_name_for_lookup}_{cid}"
-                if key not in st.session_state:
-                    st.session_state[key] = int(saved_bids.get(cid, 0))
+            # Persistent bids dictionary in session state across filtering
+            bids_key = f"bids_{student_name_for_lookup}_{student_grade_input}"
+            if bids_key not in st.session_state:
+                st.session_state[bids_key] = {
+                    str(c_row["class_id"]): int(saved_bids.get(str(c_row["class_id"]), 0))
+                    for _, c_row in eligible_classes.iterrows()
+                }
+            else:
+                # Sync any newly loaded or uninitialized class_id into bids_key
+                for _, c_row in eligible_classes.iterrows():
+                    cid = str(c_row["class_id"])
+                    if cid not in st.session_state[bids_key]:
+                        st.session_state[bids_key][cid] = int(saved_bids.get(cid, 0))
 
-            # Calculate total points spent (based on ALL eligible classes, not just filtered ones)
+            # Calculate total points spent based on ALL eligible classes
             total_spent = sum(
-                st.session_state.get(f"bid_{parent_email}_{student_name_for_lookup}_{cid}", 0)
+                st.session_state[bids_key].get(str(cid), 0)
                 for cid in eligible_classes["class_id"]
             )
             points_left = 100 - total_spent
@@ -286,46 +319,55 @@ with tab_parent:
                     f"{points_left} / 100",
                     delta=None if points_left >= 0 else "Over Budget!",
                 )
+
+            confirm_key = f"confirm_mode_{student_name_for_lookup}_{student_grade_input}"
+            if confirm_key not in st.session_state:
+                st.session_state[confirm_key] = False
+
             with col_submit_button:
                 st.markdown("<br>", unsafe_allow_html=True) # Add some space to align
-                submit_button_key = f"submit_bids_{parent_email}_{student_name_for_lookup}"
+                if st.button("Submit / Update Bids", type="primary", key=f"submit_bids_{student_name_for_lookup}_{student_grade_input}"):
+                    if points_left < 0:
+                        st.error("Please adjust bids so total points do not exceed 100.")
+                        st.session_state[confirm_key] = False
+                    elif points_left == 0:
+                        st.session_state[confirm_key] = False
+                        process_submission(
+                            parent_email,
+                            student_name_for_lookup,
+                            student_name_display,
+                            student_grade_input,
+                            parent_name,
+                            eligible_classes,
+                        )
+                    else: # points_left > 0
+                        st.session_state[confirm_key] = True
 
-                # Use st.form to capture the button click and subsequent actions if points_left > 0
-                with st.form(key=f"bid_form_{parent_email}_{student_name_for_lookup}"):
-                    submitted = st.form_submit_button("Submit / Update Bids", type="primary")
-
-                    if submitted:
-                        if points_left < 0:
-                            st.error("Please adjust bids so total points do not exceed 100.")
-                        elif points_left > 0: # Points remaining, warn user
-                            st.warning(f"You have {points_left} points remaining. Do you want to submit anyway?")
-                            if st.button("Confirm Submission Anyway", key=f"confirm_submit_{submit_button_key}"):
-                                process_submission(
-                                    parent_email,
-                                    student_name_for_lookup,
-                                    student_name_display,
-                                    student_grade_input,
-                                    parent_name,
-                                    eligible_classes,
-                                )
-                        else: # points_left == 0 (or already negative and handled by error)
-                            process_submission(
-                                parent_email,
-                                student_name_for_lookup,
-                                student_name_display,
-                                student_grade_input,
-                                parent_name,
-                                eligible_classes,
-                            )
-
+            if st.session_state.get(confirm_key, False):
+                st.warning(f"⚠️ You have **{points_left} points remaining** out of 100. Unallocated points will not be used in course placement. Are you sure you want to submit?")
+                btn_col1, btn_col2 = st.columns(2)
+                with btn_col1:
+                    if st.button("Confirm Submission", type="primary", key=f"btn_confirm_{student_name_for_lookup}_{student_grade_input}"):
+                        st.session_state[confirm_key] = False
+                        process_submission(
+                            parent_email,
+                            student_name_for_lookup,
+                            student_name_display,
+                            student_grade_input,
+                            parent_name,
+                            eligible_classes,
+                        )
+                with btn_col2:
+                    if st.button("Cancel", key=f"btn_cancel_{student_name_for_lookup}_{student_grade_input}"):
+                        st.session_state[confirm_key] = False
+                        st.rerun()
 
             # Display summary of non-zero bids
             st.markdown("### Your Current Bids")
             student_bids_summary = {}
             for _, c_row in eligible_classes.iterrows():
                 cid = str(c_row["class_id"])
-                key = f"bid_{parent_email}_{student_name_for_lookup}_{cid}"
-                bid_val = st.session_state.get(key, 0)
+                bid_val = st.session_state[bids_key].get(cid, 0)
                 if bid_val > 0:
                     student_bids_summary[c_row['title']] = bid_val
 
@@ -345,7 +387,7 @@ with tab_parent:
             selected_day = filter_col1.selectbox(
                 'Day of Week',
                 ['All'] + all_days,
-                key=f"filter_day_{parent_email}_{student_name_for_lookup}"
+                key=f"filter_day_{student_name_for_lookup}_{student_grade_input}"
             )
 
             # Title Filter (Dropdown)
@@ -353,7 +395,7 @@ with tab_parent:
             selected_title = filter_col2.selectbox(
                 'Title',
                 distinct_titles,
-                key=f"filter_title_{parent_email}_{student_name_for_lookup}"
+                key=f"filter_title_{student_name_for_lookup}_{student_grade_input}"
             )
 
             # Cost Filter (Dropdown of distinct costs)
@@ -361,18 +403,18 @@ with tab_parent:
             selected_cost = filter_col3.selectbox(
                 'Cost',
                 distinct_costs,
-                key=f"filter_cost_{parent_email}_{student_name_for_lookup}"
+                key=f"filter_cost_{student_name_for_lookup}_{student_grade_input}"
             )
 
             # Remove All Filters Button
             with filter_col4:
                 st.markdown("<br>", unsafe_allow_html=True) # Add some space to align
-                if st.button("Remove All Filters", key=f"remove_filters_{parent_email}_{student_name_for_lookup}"):
+                if st.button("Remove All Filters", key=f"remove_filters_{student_name_for_lookup}_{student_grade_input}"):
                     # Reset session state for filters to trigger a re-render with default values
-                    st.session_state[f"filter_day_{parent_email}_{student_name_for_lookup}"] = 'All'
-                    st.session_state[f"filter_title_{parent_email}_{student_name_for_lookup}"] = 'All'
-                    st.session_state[f"filter_cost_{parent_email}_{student_name_for_lookup}"] = 'All'
-                    st.experimental_rerun()
+                    st.session_state[f"filter_day_{student_name_for_lookup}_{student_grade_input}"] = 'All'
+                    st.session_state[f"filter_title_{student_name_for_lookup}_{student_grade_input}"] = 'All'
+                    st.session_state[f"filter_cost_{student_name_for_lookup}_{student_grade_input}"] = 'All'
+                    st.rerun()
 
 
             # Apply filters
@@ -399,9 +441,12 @@ with tab_parent:
             st.markdown("<br>", unsafe_allow_html=True) # Add whitespace after filters
 
             # Render Class Options (using filtered_classes for display)
+            def update_bid_state(c_id, s_key):
+                st.session_state[bids_key][c_id] = st.session_state[s_key]
+
             for _, c_row in filtered_classes.iterrows():
                 cid = str(c_row["class_id"])
-                key = f"bid_{parent_email}_{student_name_for_lookup}_{cid}"
+                slider_key = f"bid_{student_name_for_lookup}_{student_grade_input}_{cid}"
 
                 with st.container():
                     st.markdown(f"**{c_row['title']}**")
@@ -413,7 +458,11 @@ with tab_parent:
                     st.markdown(f"Cost: ${c_row['cost']} | Grades: {grade_display} | Capacity: {c_row['capacity']}")
                     st.caption(c_row["description"])
 
-                    current_val = st.session_state[key]
+                    current_val = int(st.session_state[bids_key].get(cid, 0))
+
+                    # Always sync slider widget key with current_val from bids_key
+                    st.session_state[slider_key] = current_val
+
                     # Max allowed should consider the total points left from ALL bids
                     max_allowed = min(100, current_val + max(0, points_left))
 
@@ -421,9 +470,10 @@ with tab_parent:
                         f"Points for {c_row['title']}",
                         min_value=0,
                         max_value=max(1, max_allowed),
-                        value=current_val,
                         step=5,
-                        key=key,
+                        key=slider_key,
+                        on_change=update_bid_state,
+                        args=(cid, slider_key),
                     )
                     st.markdown("---")
 

@@ -1,0 +1,6 @@
+.venv/
+.streamlit/
+.continue/
+__pycache__/
+.continueignore
+service_account.json
