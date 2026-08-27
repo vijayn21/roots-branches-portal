@@ -1,0 +1,24 @@
+- modularize the code
+- current bids should show day and times also
+- can the classes be viewed as a grid with the long description being a tool tip on the title?
+    - the field to enter would be the points
+
+Admin allocation: 
+- change just to "admin"
+- a button to clear all submissions
+- a button to display current submissions
+- a button to validate current submissions. report should include:
+    - students that appear with more than 1 updated_at. option to choose the one to keep
+    - students that appear but are not in school roster (might be typo)
+        - match on name and grad class which gets mapped to grade
+        - option to edit the name and/or grade of a a submission
+- run allocation requires a clean validation first
+    - 
+
+
+done
+- why does "load sheet data" appear on the site after step 1
+- why does command+C open a window to clear cache?
+- Your Current Bids should be Your Current Bids (unsubmitted) before submissions and (submitted) after submission
+- a button to clear all current bids
+- Write instructions at the top
