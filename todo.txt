@@ -1,5 +1,4 @@
 - modularize the code
-- current bids should show day and times also
 - can the classes be viewed as a grid with the long description being a tool tip on the title?
     - the field to enter would be the points
 
@@ -22,3 +21,4 @@ done
 - Your Current Bids should be Your Current Bids (unsubmitted) before submissions and (submitted) after submission
 - a button to clear all current bids
 - Write instructions at the top
+- current bids should show day and times also
