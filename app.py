@@ -212,10 +212,9 @@ with tab_parent:
         - Your student is uniquely identified by their name (case insensitive) and grade - please check that you have entered these correctly.
     - **Step 2:** You have **100 points** to allocate across your child's eligible classes (based on grade).
         - If you have previously submitted bids for your student, they will appear and you can modify them.
-        - Use the filters to find specific classes by day, title, or cost.
         - You can allocate points to however many classes you want, but you will not be assigned more than what is allowed by the program (see "Constraints" below)
         - You may bid on classes that overlap. If you win more than 1, your student will be assigned to their highest-bid choice.
-        - When deciding your bids, keep in mind the the capacity, schedule, and cost of each class.
+        - When deciding your bids, keep in mind the capacity, schedule, and cost of each class.
     - **Submitting:** Click **Submit / Update Bids** when you are ready to record or update your selections.
         - You can return to this site and modify previous submissions as many times as you want prior to the deadline
         - Latest submissions will overwrite previous ones for the same student and grade.
@@ -456,12 +455,21 @@ with tab_parent:
             st.markdown("### Filter Classes")
             filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
 
+            filter_day_key = f"filter_day_{student_name_for_lookup}_{student_grade_input}"
+            filter_title_key = f"filter_title_{student_name_for_lookup}_{student_grade_input}"
+            filter_cost_key = f"filter_cost_{student_name_for_lookup}_{student_grade_input}"
+
+            def reset_filters():
+                st.session_state[filter_day_key] = 'All'
+                st.session_state[filter_title_key] = 'All'
+                st.session_state[filter_cost_key] = 'All'
+
             # Day of Week Filter (Mon-Fri only)
             all_days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
             selected_day = filter_col1.selectbox(
                 'Day of Week',
                 ['All'] + all_days,
-                key=f"filter_day_{student_name_for_lookup}_{student_grade_input}"
+                key=filter_day_key
             )
 
             # Title Filter (Dropdown)
@@ -469,7 +477,7 @@ with tab_parent:
             selected_title = filter_col2.selectbox(
                 'Title',
                 distinct_titles,
-                key=f"filter_title_{student_name_for_lookup}_{student_grade_input}"
+                key=filter_title_key
             )
 
             # Cost Filter (Dropdown of distinct costs)
@@ -477,18 +485,17 @@ with tab_parent:
             selected_cost = filter_col3.selectbox(
                 'Cost',
                 distinct_costs,
-                key=f"filter_cost_{student_name_for_lookup}_{student_grade_input}"
+                key=filter_cost_key
             )
 
             # Remove All Filters Button
             with filter_col4:
                 st.markdown("<br>", unsafe_allow_html=True) # Add some space to align
-                if st.button("Remove All Filters", key=f"remove_filters_{student_name_for_lookup}_{student_grade_input}"):
-                    # Reset session state for filters to trigger a re-render with default values
-                    st.session_state[f"filter_day_{student_name_for_lookup}_{student_grade_input}"] = 'All'
-                    st.session_state[f"filter_title_{student_name_for_lookup}_{student_grade_input}"] = 'All'
-                    st.session_state[f"filter_cost_{student_name_for_lookup}_{student_grade_input}"] = 'All'
-                    st.rerun()
+                st.button(
+                    "Remove All Filters",
+                    key=f"remove_filters_{student_name_for_lookup}_{student_grade_input}",
+                    on_click=reset_filters
+                )
 
 
             # Apply filters
