@@ -32,7 +32,7 @@ def get_gspread_client():
     return gspread.authorize(creds)
 
 
-@st.cache_data(ttl=3600) # Cache data for 1 hour
+@st.cache_data(ttl=3600, show_spinner=False) # Cache data for 1 hour
 def load_sheet_data(tab_name):
   gc = get_gspread_client()
   sheet = gc.open(GHSEET_NAME).worksheet(tab_name)
@@ -140,7 +140,7 @@ def generate_class_ids(df_classes_raw):
 st.set_page_config(
     page_title="Roots and Branches Bidding",
     page_icon="🎒",
-    layout="centered",
+    layout="wide",
 )
 
 st.title("🎒 Roots and Branches Bidding Portal")
@@ -196,6 +196,8 @@ def process_submission(parent_email, student_name_for_lookup, student_name_displ
             + df_new.values.tolist()
         )
     st.cache_data.clear()
+    submitted_flag_key = f"has_submitted_{student_name_for_lookup}_{student_grade_input}"
+    st.session_state[submitted_flag_key] = True
     st.success(f"✅ Bids successfully recorded for {student_name_display}!")
     st.balloons()
 
@@ -204,7 +206,32 @@ def process_submission(parent_email, student_name_for_lookup, student_name_displ
 # TAB 1: PARENT PORTAL
 # ==========================================
 with tab_parent:
-    st.markdown("### Step 1: Student & Parent Identification")
+    st.markdown("""
+    ### Instructions
+    - **Step 1:** Enter parent and student identification details, then click **Proceed to Step 2**
+        - Your student is uniquely identified by their name (case insensitive) and grade - please check that you have entered these correctly.
+    - **Step 2:** You have **100 points** to allocate across your child's eligible classes (based on grade).
+        - If you have previously submitted bids for your student, they will appear and you can modify them.
+        - Use the filters to find specific classes by day, title, or cost.
+        - You can allocate points to however many classes you want, but you will not be assigned more than what is allowed by the program (see "Constraints" below)
+        - You may bid on classes that overlap. If you win more than 1, your student will be assigned to their highest-bid choice.
+        - When deciding your bids, keep in mind the the capacity, schedule, and cost of each class.
+    - **Submitting:** Click **Submit / Update Bids** when you are ready to record or update your selections.
+        - You can return to this site and modify previous submissions as many times as you want prior to the deadline
+        - Latest submissions will overwrite previous ones for the same student and grade.
+    - At any time, you can refresh the page to start over. Any previously submitted bids will remain in the system (and can be modified).
+
+    ### Assignment method
+    - After the deadline, an algorithm will assign students to classes in descending order of bids to maximize the total bid points across all classes
+    - Ties are broken randomly, but no student can win a 2nd tie against a student that hasn't won any ties
+    - The algorithm respects the following constraints for each student: 
+        - No more than 4 total classes total
+        - No more than 3 classes that are not sports, private music, or private language
+        - No overlapping classes
+    """)
+    st.divider()
+
+    st.markdown("### Step 1: Parent/Student Identification")
 
     col1, col2 = st.columns(2)
     parent_email = (
@@ -324,6 +351,10 @@ with tab_parent:
             if confirm_key not in st.session_state:
                 st.session_state[confirm_key] = False
 
+            confirm_clear_key = f"confirm_clear_mode_{student_name_for_lookup}_{student_grade_input}"
+            if confirm_clear_key not in st.session_state:
+                st.session_state[confirm_clear_key] = False
+
             with col_submit_button:
                 st.markdown("<br>", unsafe_allow_html=True) # Add some space to align
                 if st.button("Submit / Update Bids", type="primary", key=f"submit_bids_{student_name_for_lookup}_{student_grade_input}"):
@@ -342,6 +373,29 @@ with tab_parent:
                         )
                     else: # points_left > 0
                         st.session_state[confirm_key] = True
+
+                if st.button("Clear Current Bids", key=f"clear_bids_{student_name_for_lookup}_{student_grade_input}"):
+                    st.session_state[confirm_clear_key] = True
+
+            if st.session_state.get(confirm_clear_key, False):
+                st.warning("⚠️ This would clear tentative bids made during this session. It would not affect previously submitted bids.")
+                clear_col1, clear_col2 = st.columns(2)
+                with clear_col1:
+                    if st.button("Yes, Clear Current Bids", type="primary", key=f"btn_confirm_clear_{student_name_for_lookup}_{student_grade_input}"):
+                        st.session_state[confirm_clear_key] = False
+                        # Reset all tentative bids in session state to 0
+                        st.session_state[bids_key] = {
+                            str(c_row["class_id"]): 0 for _, c_row in eligible_classes.iterrows()
+                        }
+                        for _, c_row in eligible_classes.iterrows():
+                            cid = str(c_row["class_id"])
+                            slider_k = f"bid_{student_name_for_lookup}_{student_grade_input}_{cid}"
+                            st.session_state[slider_k] = 0
+                        st.rerun()
+                with clear_col2:
+                    if st.button("Cancel", key=f"btn_cancel_clear_{student_name_for_lookup}_{student_grade_input}"):
+                        st.session_state[confirm_clear_key] = False
+                        st.rerun()
 
             if st.session_state.get(confirm_key, False):
                 st.warning(f"⚠️ You have **{points_left} points remaining** out of 100. Unallocated points will not be used in course placement. Are you sure you want to submit?")
@@ -363,7 +417,18 @@ with tab_parent:
                         st.rerun()
 
             # Display summary of non-zero bids
-            st.markdown("### Your Current Bids")
+            submitted_flag_key = f"has_submitted_{student_name_for_lookup}_{student_grade_input}"
+            has_newly_submitted = st.session_state.get(submitted_flag_key, False)
+            has_previously_submitted = not existing_lookup.empty
+
+            if has_newly_submitted:
+                bids_header = "### Your Newly Submitted Bids"
+            elif has_previously_submitted:
+                bids_header = "### Your Previously Submitted Bids"
+            else:
+                bids_header = "### Your Current Bids (unsubmitted)"
+
+            st.markdown(bids_header)
             student_bids_summary = {}
             for _, c_row in eligible_classes.iterrows():
                 cid = str(c_row["class_id"])
@@ -373,7 +438,16 @@ with tab_parent:
 
             if student_bids_summary:
                 for title, bid_val in student_bids_summary.items():
-                    st.write(f"- **{title}**: {bid_val} points")
+                    # Find class row details from eligible_classes
+                    c_info = eligible_classes[eligible_classes['title'] == title].iloc[0]
+                    grade_disp = format_grade_display(c_info['grade_min'], c_info['grade_max'])
+                    st.write(
+                        f"- **{title}**: **{bid_val} points** | "
+                        f"Days: {c_info['day_of_week']} | "
+                        f"Time: {c_info['start_time']} - {c_info['end_time']} | "
+                        f"Cost: ${c_info['cost']} | "
+                        f"Grades: {grade_disp}"
+                    )
             else:
                 st.info("No bids placed yet.")
             st.divider()
