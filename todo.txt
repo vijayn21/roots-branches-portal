@@ -1,7 +1,4 @@
 - modularize the code
-- can the classes be viewed as a grid with the long description being a tool tip on the title?
-    - the field to enter would be the points
-    - there should be "split evenly on filtered" button
 
 
 Admin allocation: 
