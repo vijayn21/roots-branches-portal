@@ -211,12 +211,11 @@ with tab_parent:
     - **Step 1:** Enter parent and student identification details, then click **Proceed to Step 2**
         - Your student is uniquely identified by their name (case insensitive) and grade - please check that you have entered these correctly.
     - **Step 2:** You have **100 points** to allocate across classes.
-        - Eligible classes are based on the child's grade and are shown under in a table at the bottom
+        - Eligible classes are based on the child's grade and are shown in a table at the bottom
         - If you have previously submitted bids for your student, they will appear and you can modify them.
         - As you allocate points to classes, your current bids are updated (but still not submitted)
-        - You can allocate points to however many classes you want, but you will not be assigned more than what is allowed by the program (see "Constraints" below)
+        - You can allocate points to however many classes you want, but you will not be assigned more than what is allowed by the program (see "Assignment Method" below)
         - You may bid on classes that overlap. If you win more than 1, your student will be assigned to their highest-bid choice.
-        - When deciding your bids, keep in mind the capacity, schedule, and cost of each class.
     - **Submitting:** Click **Submit / Update Bids** when you are ready to record or update your selections.
         - You can return to this site and modify previous submissions as many times as you want prior to the deadline
         - Latest submissions will overwrite previous ones for the same student and grade.
@@ -305,9 +304,6 @@ with tab_parent:
 
         st.divider()
         st.markdown("### Step 2: Allocate Bidding Points (Max 100)")
-        st.caption(
-            "Note: You may bid on classes that overlap. If you win both, our optimization solver will assign your child to their higher-bid choice."
-        )
 
         # Filter classes by grade eligibility using student_grade_int
         eligible_classes = df_classes[
@@ -439,7 +435,7 @@ with tab_parent:
             if points_left < 0:
                 st.error("⚠️ Invalid Bid Allocation: Total points used exceeds 100! Please reduce one or more bid amounts.")
 
-            # Filter non-zero bids for read-only table summary
+            # Filter non-zero bids for read-only summary
             summary_rows = []
             for _, c_row in eligible_classes.iterrows():
                 cid = str(c_row["class_id"])
@@ -448,39 +444,24 @@ with tab_parent:
                     summary_rows.append(c_row)
 
             if summary_rows:
-                df_summary_classes = pd.DataFrame(summary_rows)
-                # Table headers for read-only summary
-                hdr_cols = st.columns([3, 1.5, 2.5, 1, 1.2, 1, 1.5])
-                hdr_cols[0].markdown("**Title**")
-                hdr_cols[1].markdown("**Days**")
-                hdr_cols[2].markdown("**Time**")
-                hdr_cols[3].markdown("**Cost**")
-                hdr_cols[4].markdown("**Grades**")
-                hdr_cols[5].markdown("**Capacity**")
-                hdr_cols[6].markdown("**Bid Amount**")
-                st.markdown("---")
-
-                for _, s_row in df_summary_classes.iterrows():
+                for s_row in summary_rows:
                     cid = str(s_row["class_id"])
                     bid_val = st.session_state[bids_key].get(cid, 0)
                     g_disp = format_grade_display(s_row["grade_min"], s_row["grade_max"])
                     tooltip_text = f"Dates: {s_row['dates']}\n\nDescription: {s_row['description']}"
 
-                    r_cols = st.columns([3, 1.5, 2.5, 1, 1.2, 1, 1.5])
-                    r_cols[0].markdown(f"**{s_row['title']}**", help=tooltip_text)
-                    r_cols[1].write(s_row["day_of_week"])
-                    r_cols[2].write(f"{s_row['start_time']} - {s_row['end_time']}")
-                    r_cols[3].write(f"${int(s_row['cost'])}")
-                    r_cols[4].write(g_disp)
-                    r_cols[5].write(str(s_row["capacity"]))
-                    r_cols[6].markdown(f"**{bid_val}**")
+                    st.markdown(
+                        f"- **{s_row['title']}**: **{bid_val} points** | "
+                        f"Days: {s_row['day_of_week']} | Time: {s_row['start_time']} - {s_row['end_time']} | "
+                        f"Cost: ${int(s_row['cost'])} | Grades: {g_disp}",
+                        help=tooltip_text,
+                    )
             else:
-                st.info("No bids placed yet.")
+                st.info("No bids entered yet.")
             st.divider()
 
             # Add filters
-            st.markdown("### Filter Classes")
-            filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
+            st.markdown("### Class Options")
 
             filter_day_key = f"filter_day_{student_name_for_lookup}_{student_grade_input}"
             filter_title_key = f"filter_title_{student_name_for_lookup}_{student_grade_input}"
@@ -490,6 +471,8 @@ with tab_parent:
                 st.session_state[filter_day_key] = 'All'
                 st.session_state[filter_title_key] = 'All'
                 st.session_state[filter_cost_key] = 'All'
+
+            filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
 
             # Day of Week Filter (Mon-Fri only)
             all_days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
@@ -542,26 +525,12 @@ with tab_parent:
                     filtered_classes['cost'] == int(selected_cost)
                 ]
 
-            st.markdown("### Class Options")
-
             if filtered_classes.empty:
                 st.info("No classes match your filter criteria.")
             else:
-                # Render Class Options as a compact table
                 def update_num_bid_state(c_id, num_k):
                     new_val = int(st.session_state[num_k])
                     st.session_state[bids_key][c_id] = new_val
-
-                # Table Header
-                t_hdr = st.columns([3, 1.5, 2.5, 1, 1.2, 1, 1.8])
-                t_hdr[0].markdown("**Title**")
-                t_hdr[1].markdown("**Days**")
-                t_hdr[2].markdown("**Time**")
-                t_hdr[3].markdown("**Cost**")
-                t_hdr[4].markdown("**Grades**")
-                t_hdr[5].markdown("**Capacity**")
-                t_hdr[6].markdown("**Bid Amount**")
-                st.markdown("---")
 
                 for _, c_row in filtered_classes.iterrows():
                     cid = str(c_row["class_id"])
@@ -573,23 +542,29 @@ with tab_parent:
                     current_val = int(st.session_state[bids_key].get(cid, 0))
                     st.session_state[num_key] = current_val
 
-                    t_cols = st.columns([3, 1.5, 2.5, 1, 1.2, 1, 1.8])
-                    t_cols[0].markdown(f"**{c_row['title']}**", help=tooltip_text)
-                    t_cols[1].write(c_row["day_of_week"])
-                    t_cols[2].write(f"{c_row['start_time']} - {c_row['end_time']}")
-                    t_cols[3].write(f"${int(c_row['cost'])}")
-                    t_cols[4].write(grade_display)
-                    t_cols[5].write(str(c_row["capacity"]))
-                    t_cols[6].number_input(
-                        f"Bid for {c_row['title']}",
-                        min_value=0,
-                        max_value=100,
-                        step=1,
-                        key=num_key,
-                        on_change=update_num_bid_state,
-                        args=(cid, num_key),
-                        label_visibility="collapsed"
-                    )
+                    with st.container():
+                        card_col1, card_col2 = st.columns([0.7, 0.3])
+                        with card_col1:
+                            st.markdown(f"**{c_row['title']}**", help=tooltip_text)
+                            st.caption(
+                                f"📅 **{c_row['day_of_week']}** | "
+                                f"⏰ {c_row['start_time']} - {c_row['end_time']} | "
+                                f"💵 ${int(c_row['cost'])} | "
+                                f"🎓 Grades {grade_display} | "
+                                f"👥 Cap: {c_row['capacity']}"
+                            )
+                        with card_col2:
+                            st.number_input(
+                                f"Bid for {c_row['title']}",
+                                min_value=0,
+                                max_value=100,
+                                step=1,
+                                key=num_key,
+                                on_change=update_num_bid_state,
+                                args=(cid, num_key),
+                                label_visibility="collapsed"
+                            )
+                        st.markdown("---")
 
 
 # ==========================================

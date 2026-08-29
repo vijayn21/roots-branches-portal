@@ -5,12 +5,26 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 
--- streamlit dummy files for testing
-mkdir -p .streamlit
-touch .streamlit/secrets.toml
-
-
 -- test command to create local tunnel
 streamlit run app.py
 
+
+-- steps to recreate codespace environment
+touch .streamlit/secrets.toml
+touch .continueignore (and populate with saved continueignore.txt)
+copy service_account.json
+install extensions
+    - Continue (continue.continue)
+    - Python (ms-python.python)
+    - Jupyter (ms-toolsai.jupyter)
+setup gemini on continue
+    - go to https://aistudio.google.com
+    - find the project and copy the API key into the continue config
+virtual env setup
+
+
+
+-- streamlit dummy files for testing
+mkdir -p .streamlit
+touch .streamlit/secrets.toml
 
