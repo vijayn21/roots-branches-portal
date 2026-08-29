@@ -3,16 +3,18 @@
 
 Admin allocation: 
 - change just to "admin"
+- dropdown menus for actions rather than buttons, with a submit button to actually take the action
 - a button to clear all submissions
 - a button to display current submissions
 - a button to validate current submissions. report should include:
     - students that appear with more than 1 updated_at. option to choose the one to keep
-    - students that appear but are not in school roster (might be typo)
-        - match on name and grad class which gets mapped to grade
-        - option to edit the name and/or grade of a a submission
-- run allocation requires a clean validation first
-- run allocation outputs the following on the page
-    - a table of each class, number of assignments, and capacity
-    - a table of each student, total assignments, and total non-private and non-sport assignments
-    - these should be outputted to the google sheet as well, in addition to the assignments currently outputted
+    - students that appear but are not in school roster (might be typo, need a roster for this)
+        - match on name and grad class (from roster) which gets mapped to name and grade in submission
+        - option to edit the name and/or grade of a submission
+- run allocation
+    - requires a clean validation first
+    - outputs the following on the page
+        - a table of each class, number of assignments, and capacity
+        - a table of each student, total assignments, and total non-private and non-sport assignments
+        - these should be outputted to the google sheet as well, in addition to the assignments currently outputted
 - an option to email out the assignments
