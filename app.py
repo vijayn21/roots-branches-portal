@@ -143,6 +143,20 @@ st.set_page_config(
     layout="wide",
 )
 
+st.markdown(
+    """
+    <style>
+    /* Ensure tooltips wrap and don't get cut off on mobile portrait */
+    div[data-testid="stTooltipContent"] {
+        max-width: 85vw !important;
+        white-space: pre-wrap !important;
+        word-wrap: break-word !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.title("🎒 Roots and Branches Bidding Portal")
 
 tab_parent, tab_admin = st.tabs(["Parent Portal", "Admin Allocation"])
@@ -211,19 +225,19 @@ with tab_parent:
     - **Step 1:** Enter parent and student identification details, then click **Proceed to Step 2**
         - Your student is uniquely identified by their name (case insensitive) and grade - please check that you have entered these correctly.
     - **Step 2:** You have **100 points** to allocate across classes.
-        - Eligible classes are based on the child's grade and are shown in a table at the bottom
+        - Your child's eligible classes (based on grade) will be displayed below, where you can enter a bid for each class.
         - If you have previously submitted bids for your student, they will appear and you can modify them.
-        - As you allocate points to classes, your current bids are updated (but still not submitted)
-        - You can allocate points to however many classes you want, but you will not be assigned more than what is allowed by the program (see "Assignment Method" below)
+        - As you allocate points to classes, your current bids are displayed at the top (but still not submitted).
+        - You can allocate points to however many classes you want, but you will not be assigned more than what is allowed by the program (see "Assignment Method" below).
         - You may bid on classes that overlap. If you win more than 1, your student will be assigned to their highest-bid choice.
     - **Submitting:** Click **Submit / Update Bids** when you are ready to record or update your selections.
-        - You can return to this site and modify previous submissions as many times as you want prior to the deadline
+        - You can return to this site and modify previous submissions as many times as you want prior to the deadline.
         - Latest submissions will overwrite previous ones for the same student and grade.
     - At any time, you can refresh the page to start over. Any previously submitted bids will remain in the system (and can be modified).
 
     ### Assignment method
-    - After the deadline, an algorithm will assign students to classes in descending order of bids to maximize the total bid points across all classes
-    - Ties are broken randomly, but no student can win a 2nd tie against a student that hasn't won any ties
+    - After the deadline, an algorithm will assign students to classes in descending order of bids to maximize the total bid points across all classes.
+    - Ties are broken randomly, but no student can win a 2nd tie against a student that hasn't won any ties.
     - The algorithm respects the following constraints for each student: 
         - No more than 4 total classes total
         - No more than 3 classes that are not sports, private music, or private language
