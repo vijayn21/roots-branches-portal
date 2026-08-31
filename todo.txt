@@ -6,7 +6,6 @@ general
     - add a tab with prereqs by class
 
 parent portal
-- email the submission after it's submitted
 - eligible classes should be filtered based on prereqs and student class history
 
 Admin allocation: 

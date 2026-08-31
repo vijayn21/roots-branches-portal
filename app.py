@@ -6,6 +6,8 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 from pulp import LpMaximize, LpMinimize, LpProblem, LpVariable, lpSum
+import smtplib
+from email.message import EmailMessage
 import streamlit as st
 
 # ==========================================
@@ -114,6 +116,34 @@ def format_grade_display(min_grade, max_grade):
         return min_display
     return f"{min_display}-{max_display}"
 
+def send_confirmation_email(recipient_email, student_name, bids_summary_text):
+    sender_email = st.secrets.get("EMAIL_ADDRESS")
+    sender_password = st.secrets.get("EMAIL_PASSWORD")
+    
+    if not sender_email or not sender_password:
+        print("Email secrets not found. Skipping confirmation email.")
+        return
+
+    msg = EmailMessage()
+    msg['Subject'] = f'Roots and Branches Bidding Confirmation for {student_name}'
+    msg['From'] = sender_email
+    msg['To'] = recipient_email
+
+    body = f"Hello,\n\nThank you for submitting your bids for {student_name}.\n\n"
+    body += "Here is a summary of your currently recorded bids:\n\n"
+    body += bids_summary_text
+    body += "\n\nYou can return to the portal at any time before the deadline to update these bids."
+    body += "\n\nBest,\nRoots and Branches Team"
+
+    msg.set_content(body)
+
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+    except Exception as e:
+        print(f"Failed to send confirmation email: {e}")
+
 def generate_class_ids(df_classes_raw):
     df_temp = df_classes_raw.copy()
 
@@ -183,6 +213,8 @@ def process_submission(parent_email, student_name_for_lookup, student_name_displ
     bids_key = f"bids_{student_name_for_lookup}_{student_grade_input}"
     bids_dict = st.session_state.get(bids_key, {})
 
+    bids_summary_lines = []
+
     # Iterate over ALL eligible classes to get their bids from persistent state
     for _, c_row in eligible_classes.iterrows():
         cid = str(c_row["class_id"])
@@ -200,6 +232,7 @@ def process_submission(parent_email, student_name_for_lookup, student_name_displ
                     "updated_at": now,
                 }
             )
+            bids_summary_lines.append(f"- {c_row['title']}: {bid_val} points")
 
     # Overwrite sheet data
     sheet.clear()
@@ -212,7 +245,12 @@ def process_submission(parent_email, student_name_for_lookup, student_name_displ
     st.cache_data.clear()
     submitted_flag_key = f"has_submitted_{student_name_for_lookup}_{student_grade_input}"
     st.session_state[submitted_flag_key] = True
-    st.success(f"✅ Bids successfully recorded for {student_name_display}!")
+    
+    if bids_summary_lines:
+        bids_summary_text = "\n".join(bids_summary_lines)
+        send_confirmation_email(parent_email, student_name_display, bids_summary_text)
+        
+    st.success(f"✅ Bids successfully recorded for {student_name_display}!\n\nA confirmation email has been sent to **{parent_email}**.")
     st.balloons()
 
 
@@ -442,7 +480,7 @@ with tab_parent:
             with col_pts2:
                 st.metric(
                     "Points Remaining",
-                    f"{points_left} / 100",
+                    f"{points_left}",
                     delta=None if points_left >= 0 else "Over Budget!",
                 )
 
