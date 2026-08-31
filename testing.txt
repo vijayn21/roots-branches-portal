@@ -10,7 +10,9 @@ streamlit run app.py
 
 
 -- steps to recreate codespace environment
-touch .streamlit/secrets.toml
+copy secrets.toml into .streamlit/
+    - EMAIL_ADDRESS = "vijay.narasiman@gmail.com"
+    - EMAIL_PASSWORD = "<generate app pw in google account"
 touch .continueignore (and populate with saved continueignore.txt)
 copy service_account.json
 install extensions
