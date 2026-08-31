@@ -1,5 +1,13 @@
+general
 - modularize the code
+- in the gsheet
+    - add a tab containing the classes each student has completed (need school for this)
+    - add a tab containing the student roster (name and grad class). need school for this
+    - add a tab with prereqs by class
 
+parent portal
+- email the submission after it's submitted
+- eligible classes should be filtered based on prereqs and student class history
 
 Admin allocation: 
 - change just to "admin"
