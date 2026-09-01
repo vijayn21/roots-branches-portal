@@ -1,5 +1,4 @@
 general
-- modularize the code
 - create a jupyter notebook that simulates submissions and allocation
     - should test edge cases on submission rules and allocation constraints/tiebreaker logic
 - in the gsheet

@@ -28,6 +28,13 @@ st.markdown(
         max-width: 85vw !important;
         white-space: pre-wrap !important;
         word-wrap: break-word !important;
+        pointer-events: auto !important; /* Allow interaction with the tooltip */
+        overflow-y: auto !important;     /* Enable internal scrolling */
+        max-height: 50vh !important;     /* Ensure it doesn't take up the whole screen */
+    }
+    
+    div[data-testid="stTooltipHoverTarget"] {
+        pointer-events: auto !important;
     }
     </style>
     """,
@@ -73,7 +80,7 @@ with tab_parent:
     - **Step 1:** Enter parent and student identification details, then click **Proceed to Step 2**
         - Your student is uniquely identified by their name (case insensitive) and grade - please check that you have entered these correctly.
     - **Step 2:** You have **100 points** to allocate across classes.
-        - Eligible classes are based on the child's grade and are shown in a table at the bottom
+        - Enter bids for each eligible class shown below (based on the child's grade).
         - If you have previously submitted bids for your student, they will appear and you can modify them.
         - As you allocate points to classes, your current bids are updated (but still not submitted)
         - You can allocate points to however many classes you want, but you will not be assigned more than what is allowed by the program (see "Assignment Method" below)
@@ -360,7 +367,7 @@ with tab_parent:
                     with st.container():
                         card_col1, card_col2 = st.columns([0.7, 0.3])
                         with card_col1:
-                            st.markdown(f"**{c_row['title']}**", help=tooltip_text)
+                            st.markdown(f"**{c_row['title']}**")
                             st.caption(
                                 f"📅 **{c_row['day_of_week']}** | "
                                 f"⏰ {c_row['start_time']} - {c_row['end_time']} | "
@@ -368,6 +375,9 @@ with tab_parent:
                                 f"🎓 Grades {grade_display} | "
                                 f"👥 Cap: {c_row['capacity']}"
                             )
+                            with st.expander("ℹ️ Class Description & Dates"):
+                                st.markdown(f"**Dates:** {c_row['dates']}")
+                                st.markdown(f"**Description:** {c_row['description']}")
                         with card_col2:
                             st.number_input(
                                 f"Bid for {c_row['title']}",
